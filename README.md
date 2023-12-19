@@ -1,4 +1,4 @@
-# Discovery Job Checker
+# Discovery Job - Email Notification
 
 This project contains a script to check if there is a running discovery job and its running time.
 
