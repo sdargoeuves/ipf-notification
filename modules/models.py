@@ -37,7 +37,6 @@ class DiscoveryJobChecker:
         self.ipf = ipf
         self.warning_threshold = WARNING_THRESHOLD if warning_threshold is None else warning_threshold
         self.send_email_bool = os.getenv('SEND_EMAIL', "false").lower() == "true"
-        print(f"send_email variable: {self.send_email_bool}({type(self.send_email_bool)}) os variable: { os.getenv('SEND_EMAIL')}")
 
     def check_discovery_jobs(self):
         running_discovery_job = self.ipf.jobs.all_jobs.all(
