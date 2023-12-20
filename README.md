@@ -30,12 +30,34 @@ vi .env
 
 ## Usage
 
-You can run the script with the following command:
+To run the script, use the following command:
 
 ```shell
 python check_discovery.py
-#You can also specify a warning threshold in minutes:
+# You can also specify a warning threshold in minutes:
 python check_discovery.py --threshold 120
+```
+
+For continuous monitoring, it's recommended to run this script on a regular basis. One way to achieve this is by adding the script to a cron job. Here's an example of how to set up a cron job that runs the script every 4 hours:
+
+Open the crontab file:
+
+```shell
+crontab -e
+```
+
+Add the following line to the file:
+
+```shell
+0 */4 * * * /usr/bin/python /path/to/check_discovery.py --threshold 240
+```
+
+Make sure to replace `/usr/bin/python` with the path to your Python interpreter, and `/path/to/check_discovery.py` with the path to the script.
+
+Save and close the file. The new cron job will start running at the next scheduled time.
+
+```note
+Please note that the exact steps might vary depending on your operating system and environment.
 ```
 
 ## Configuration
