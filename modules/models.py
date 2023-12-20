@@ -6,11 +6,10 @@ from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 from typing import Dict
 
-# import typer
-# from dotenv import find_dotenv, load_dotenv
 from ipfabric import IPFClient
 
 LOG_LEVEL = logging.INFO
+WARNING_THRESHOLD = os.getenv("WARNING_THRESHOLD", 300)
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -34,10 +33,11 @@ class DiscoveryJobChecker:
         ipf (IPFClient): An instance of IPFClient used to interact with IP Fabric.
         warning_threshold (int): The threshold in minutes for the duration of a running discovery job.
     """
-    def __init__(self, ipf: IPFClient, warning_threshold: int, send_mail_bool: bool = False):
+    def __init__(self, ipf: IPFClient, warning_threshold: int):
         self.ipf = ipf
-        self.warning_threshold = warning_threshold
-        self.send_mail_bool = send_mail_bool
+        self.warning_threshold = WARNING_THRESHOLD if warning_threshold is None else warning_threshold
+        self.send_email_bool = os.getenv('SEND_EMAIL', "false").lower() == "true"
+        print(f"send_email variable: {self.send_email_bool}({type(self.send_email_bool)}) os variable: { os.getenv('SEND_EMAIL')}")
 
     def check_discovery_jobs(self):
         running_discovery_job = self.ipf.jobs.all_jobs.all(
@@ -49,11 +49,12 @@ class DiscoveryJobChecker:
         )
 
         if len(running_discovery_job) == 1:
+            logger.info(f"{self.ipf.base_url.host} - One discovery running")
             self.check_discovery_time(running_discovery_job[0])
         elif len(running_discovery_job) == 0:
-            logger.info("No running discovery jobs found")
+            logger.info(f"{self.ipf.base_url.host} - No discovery running")
         else:
-            logger.warning("UNEXPECTED - more than one running discovery job found")
+            logger.error(f"{self.ipf.base_url.host} - UNEXPECTED - more than one running discovery job found")
 
     def check_discovery_time(self, running_discovery_job: Dict):
         duration = self.calculate_duration(running_discovery_job)
@@ -64,15 +65,15 @@ class DiscoveryJobChecker:
 
         if duration > self.warning_threshold * 60:
             logger.warning(
-                f"Threshold: {threshold_display} exceeded - duration: {running_discovery_job['duration_display']} (hh:mm:ss)"
+                f"{self.ipf.base_url.host} - Threshold ({threshold_display}) exceeded - duration {running_discovery_job['duration_display']}"
             )
             logger.warning("Sending the notification email")
             self.send_email(running_discovery_job)
         else:
             logger.info(
-                f"Discovery within threshold: {threshold_display} - duration: {running_discovery_job['duration_display']} (hh:mm:ss)"
+                f"{self.ipf.base_url.host} - Threshold ({threshold_display}) not reached - duration {running_discovery_job['duration_display']} "
             )
-            logger.info("No notification required")
+            logger.info(f"{self.ipf.base_url.host} - No notification required")
 
 
     def send_email(self, running_discovery_job: Dict):
@@ -93,9 +94,9 @@ class DiscoveryJobChecker:
         ] = f"IP Fabric - {self.ipf.base_url.host} - DISCOVERY WARNING - Threshold exceeded - {running_discovery_job['snapshot']}"
         email.set_content(
             f"""
-    !!! IP Fabric instance: {self.ipf.base_url.host} !!!
+    --- IP Fabric instance: {self.ipf.base_url.host} ---
 
-    --- Threshold Exceeded for Ongoing Discovery ---
+    !!! Threshold Exceeded for Ongoing Discovery !!!
     Snapshot ID: {running_discovery_job['snapshot']}
     Started At: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(running_discovery_job['startedAt'] / 1000))} (UTC)
     Discovery Duration (hh:mm:ss): {running_discovery_job['duration_display']}
@@ -105,11 +106,11 @@ class DiscoveryJobChecker:
         )
         
         # for testing purposes, if email is not yet set, we can display in the logs
-        if self.send_mail_bool:
+        if self.send_email_bool:
             with smtplib.SMTP(smtp_server, smtp_port) as smtp:
                 smtp.login(smtp_login, smtp_password)
                 smtp.send_message(email)
-            logger.info(f"Email sent to {email_to}")
+            logger.info(f"{self.ipf.base_url.host} - Email sent to {email_to}")
         else:
             logger.info(email)
 
